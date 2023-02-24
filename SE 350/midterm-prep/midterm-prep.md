@@ -119,8 +119,8 @@ B5. turn = 0;
 </tr>
 </table>
 
-Analysis: Thread A runs when `turn = 0`. Thread B runs when `turn = 1`.
-\\
+Thread A runs when `turn = 0`. Thread B runs when `turn = 1`.
+<br />
 **WRONG** (1) strict alternation is needed: A -> B -> A -> B -> ... (2) If thread B is terminated, thread A will be stuck forever.
 
 <table>
