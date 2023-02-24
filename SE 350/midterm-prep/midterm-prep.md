@@ -89,7 +89,7 @@ pthread_exit( rv );
 
 ## Concurrency & Synchronization (Examples)
 
-1. 
+1. Mutual exclusion through flags
 <table>
 <tr>
 <th> Thread A </th>
@@ -99,22 +99,57 @@ pthread_exit( rv );
 <td>
 
 ```
-int foo() {
-    int result = 4;
-    return result;
-}
+A1. while ( turn != 0 ) {
+A2.     /* Wait for my turn */
+A3. }
+A4. /* critical section */
+A5. turn = 1;
 ```
-
 </td>
 <td>
 
 ```
-int foo() { 
-    int x = 4;
-    return x;
-}
+B1. while ( turn != 1 ) {
+B2.     /* Wait for my turn */
+B3. }
+B4. /* critical section */
+B5. turn = 0;
 ```
+</td>
+</tr>
+</table>
 
+Analysis: Thread A runs when `turn = 0`. Thread B runs when `turn = 1`.
+\\
+**WRONG** (1) strict alternation is needed: A -> B -> A -> B -> ... (2) If thread B is terminated, thread A will be stuck forever.
+
+<table>
+<tr>
+<th> Thread A </th>
+<th> Thread B </th>
+</tr>
+<tr>
+<td>
+
+```
+A1. flag[0] = true;
+A2. while ( flag[1] ) {
+A3.     /* Wait for my turn */
+A4. }
+A5. /* critical section */
+A6. flag[0] = false;
+```
+</td>
+<td>
+
+```
+B1. flag[1] = true;
+B2. while ( flag[0] ) {
+B3.     /* Wait for my turn */
+B4. }
+B5. /* critical section */
+B6. flag[1] = false;
+```
 </td>
 </tr>
 </table>
