@@ -39,7 +39,7 @@ int main( int argc, char** argv ) {
     return -1;
 }
 ```
-11. **Fork bomc**: call `fork` repeatedly until the number of processes spawned is too high for the system to manage. To defend, we can set limit to (1) total number of processes a user may create, and (2) the rate a use spawns a new process.
+11. **Fork bomb**: call `fork` repeatedly until the number of processes spawned is too high for the system to manage. To defend, we can set limit to (1) total number of processes a user may create, and (2) the rate a use spawns a new process.
 
 ## Threads
 1. **Thread info** (5): state; saved context; execution stack; local variables; access to resources (shared with all threads in the process)
@@ -48,31 +48,30 @@ int main( int argc, char** argv ) {
 4. **Drawbacks of threads** (2): no protection between threads in the same process; if one thread encounters an error, the whole process might terminate
 5. **POSIX threads**
 ```c
+/* global variables */
 pthread_t thread;
 foo* parmas = malloc( sizeof( foo ) );
 void *returnValue;
-
+/* helper function */
 void *goo( void *args );
-```
-```c
-pthread_create( pthread_t *thread, const pthread_attr_t *attributes, void *(*start_routine)( void * ), void *argument );
 
+pthread_create( pthread_t *thread, const pthread_attr_t *attributes
+, void *(*start_routine)( void * ), void *argument );
 pthread_create( &thread, NULL, goo, params );
-```
-```c
+
 /* Wait for a specific thread to exit */
 pthread_join( pthread_t thread, void **returnValue );
-
-pthread_join( thread, &returnValue ); /* returnValue can be read through casting to the expected pointer */
+/* returnValue can be read through casting to the expected pointer */
+pthread_join( thread, &returnValue ); 
 free(returnValue);
-```
-```c
+
 /* a thread cannot be joined */
 pthread_detach( pthread_t thread );
 /* singal cancellation to a thread, can be async or deferred */
 pthread_cancel( pthread_t thread );
 /* returns nonzero if cancelled */
 pthread_testcancel( ); 
+
 /* If main calls pthread_exit, it would wait for all unjoined thread to finish */
 pthread_exit( void *value );
 
@@ -82,6 +81,40 @@ pthread_exit( rv );
 ```
 
 ## Concurrency & Synchronization (Concepts)
-
+1. **Synchronization** vs. **parallelism**: synchronization (multiple processes and threads making progress at the same time); parallelism (more than one thread or process executing on a CPU at a given instant)
+2. **Serialization**: We want to execute events with some particular order. (e.g. merge sort)
+3. **Mutual exclusion**: Two events cannot happen at the same time. (e.g. read and write)
+4. **Atomic**: operation that cannot be interrupted
+5. 
 
 ## Concurrency & Synchronization (Examples)
+
+1. 
+<table>
+<tr>
+<th> Thread A </th>
+<th> Thread B </th>
+</tr>
+<tr>
+<td>
+
+```
+int foo() {
+    int result = 4;
+    return result;
+}
+```
+
+</td>
+<td>
+
+```
+int foo() { 
+    int x = 4;
+    return x;
+}
+```
+
+</td>
+</tr>
+</table>
