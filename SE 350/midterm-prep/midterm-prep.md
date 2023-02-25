@@ -105,10 +105,21 @@ while ( !test_and_set( busy ) ) {
 /* Critical section */
 busy = 0;
 ```
+8. **Binary semaphore**: a variable that has two values 0 and 1
+    - `wait` is how a program tries to enter the critical section
+        - if the semaphore is 1, set it to 0 and enter the critical section
+        - if the semaphore is 0, some other thread is in the critical section then the curren tthread must wait its turn and the current thread is blocked by the OS
+    - `post` is how a program sends the message that it is finished with the critical section
+        - if the semaphore is 1, do nothing
+        - if the semaphore is 0 and there is a task blocked awaiting the semaphore, the task gets unblocked
+        - if the semaphore is 0 and there are not any tasks blocked, set the semaphore to 1
+9. **Mutext** from (mutual exclusion): a binary semaphore in which only the thread that has called `wait` may `post` to the semaphore
+10. No `malloc` in critical sections: the memory allocation can be blocked. The process is currently in the critical section so no other thread can enter critical section, which might result in the system getting totally stuck.
+11. **Deadlock** (informal definition): all threads are permanently stuck
 
 ## Concurrency & Synchronization (Examples)
 
-1. Mutual exclusion through flags
+1. **Mutual exclusion through flags**
 <table>
 <tr>
 <th> Thread A </th>
@@ -117,7 +128,7 @@ busy = 0;
 <tr>
 <td>
 
-```
+```c
 A1. while ( turn != 0 ) {
 A2.     /* Wait for my turn */
 A3. }
@@ -127,7 +138,7 @@ A5. turn = 1;
 </td>
 <td>
 
-```
+```c
 B1. while ( turn != 1 ) {
 B2.     /* Wait for my turn */
 B3. }
@@ -149,7 +160,7 @@ Thread A runs when `turn = 0`. Thread B runs when `turn = 1`.
 <tr>
 <td>
 
-```
+```c
 A1. while ( busy == true ) {
 A2.     /* Wait for my turn */
 A3. }
@@ -160,7 +171,7 @@ A6. busy = false;
 </td>
 <td>
 
-```
+```c
 B1. while ( busy == true ) {
 B2.     /* Wait for my turn */
 B3. }
@@ -183,7 +194,7 @@ B6. busy = false;
 <tr>
 <td>
 
-```
+```c
 A1. flag[0] = true;
 A2. while ( flag[1] ) {
 A3.     /* Wait for my turn */
@@ -194,7 +205,7 @@ A6. flag[0] = false;
 </td>
 <td>
 
-```
+```c
 B1. flag[1] = true;
 B2. while ( flag[0] ) {
 B3.     /* Wait for my turn */
@@ -207,3 +218,182 @@ B6. flag[1] = false;
 </table>
 
 **WRONG** Thread switches after A1 and B1 would lead both threads to stuck by the while loop.
+
+2. **Semaphore syntax**
+```c
+sem_t sem;
+
+/* shared: 1 if semaphore is to be shared between processes; 0 otherwise */
+sem_init( sem_t* semaphore, int shared, int initial_value );
+sem_init( &sem, 0, 1 );
+
+sem_destroy( sem_t* semaphore );
+sem_wait( sem_t* semaphore );
+sem_post( sem_t* semaphore );
+sem_wait( &sem ); {
+    /* critical section */
+} sem_post( &sem );
+sem_destroy( &sem );
+```
+
+3. **Signalling**: Thread A always executes before Thread B.
+<table>
+<tr>
+<th> Thread A </th>
+<th> Thread B </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. Statement A1
+2. post( sem )
+```
+</td>
+<td>
+
+```c
+1. wait( sem )
+2. Statement B2
+```
+</td>
+</tr>
+</table>
+
+**CORRECT** Semaphore is initialized to 0. In this case, it makes sense for a thread to post a semaphore without the wait, and the mutex structure is not necessary in every circumstance.
+
+4. **Rendezvous**: Two threads "meet-up" at desired spots before either of them proceeds.
+<table>
+<tr>
+<th> Thread A </th>
+<th> Thread B </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. Statement A1
+2. wait( bArrived )
+3. post( aArrived )
+4. Statement A2
+```
+</td>
+<td>
+
+```c
+1. Statement B1
+2. wait( aArrived )
+3. post( bArrived )
+4. Statement B2
+```
+</td>
+</tr>
+</table>
+
+**WRONG** Both threads are blocked on wait.
+
+<table>
+<tr>
+<th> Thread A </th>
+<th> Thread B </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. Statement A1
+2. post( aArrived )
+3. wait( bArrived )
+4. Statement A2
+```
+</td>
+<td>
+
+```c
+1. Statement B1
+2. post( bArrived )
+3. wait( aArrived )
+4. Statement B2
+```
+</td>
+</tr>
+</table>
+
+**CORRECT** aArrived and bArrived are initialized to 0.
+
+
+<table>
+<tr>
+<th> Thread A </th>
+<th> Thread B </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. Statement A1
+2. wait( bArrived )
+3. post( aArrived )
+4. Statement A2
+```
+</td>
+<td>
+
+```c
+1. Statement B1
+2. post( bArrived )
+3. wait( aArrived )
+4. Statement B2
+```
+</td>
+</tr>
+</table>
+
+**CORRECT** But less efficient than the previous solution because it may require an extra context switch.
+
+5. **Mutal exclusion**: no two threads run critical section at the same time
+<table>
+<tr>
+<th> Thread A </th>
+<th> Thread B </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. wait( mutex )
+2. critical section
+3. post( mutex )
+```
+</td>
+<td>
+
+```c
+1. wait( mutex )
+2. critical section
+3. post( mutex )
+```
+</td>
+</tr>
+</table>
+
+**CORRECT** The mutex semaphore is initialized to 1. 
+
+6. **Multiplex**: at most n threads running critical section at the same time.
+<table>
+<tr>
+<th> Thread K </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. wait( mutex )
+2. critical section
+3. post( mutex )
+```
+</td>
+</tr>
+</table>
+
+**CORRECT** The mutex semaphore is initialized to n. 
