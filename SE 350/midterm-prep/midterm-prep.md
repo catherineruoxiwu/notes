@@ -139,7 +139,6 @@ B5. turn = 0;
 </table>
 
 Thread A runs when `turn = 0`. Thread B runs when `turn = 1`.
-<br />
 **WRONG** (1) strict alternation is needed: A -> B -> A -> B -> ... (2) If thread B is terminated, thread A will be stuck forever.
 
 <table>
@@ -172,6 +171,7 @@ B6. busy = false;
 </td>
 </tr>
 </table>
+
 **WRONG** When thread switch happens after A3, both threads are in the critical section at the same time.
 
 
@@ -205,4 +205,5 @@ B6. flag[1] = false;
 </td>
 </tr>
 </table>
+
 **WRONG** Thread switches after A1 and B1 would lead both threads to stuck by the while loop.
