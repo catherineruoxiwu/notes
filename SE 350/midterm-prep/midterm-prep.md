@@ -39,7 +39,7 @@ int main( int argc, char** argv ) {
     return -1;
 }
 ```
-11. **Fork bomb**: call `fork` repeatedly until the number of processes spawned is too high for the system to manage. To defend, we can set limit to (1) total number of processes a user may create, and (2) the rate a use spawns a new process.
+11. **Fork bomb**: A malicious program calls `fork` repeatedly, and the number of processes spawned is too high for the system to manage. To defend, we can set limit to (1) total number of processes a user may create, and (2) the rate a use spawns a new process.
 
 ## Threads
 1. **Thread info** (5): state; saved context; execution stack; local variables; access to resources (shared with all threads in the process)
@@ -85,7 +85,26 @@ pthread_exit( rv );
 2. **Serialization**: We want to execute events with some particular order. (e.g. merge sort)
 3. **Mutual exclusion**: Two events cannot happen at the same time. (e.g. read and write)
 4. **Atomic**: operation that cannot be interrupted
-5. 
+5. **Interrupts cannot be disabled to protect critical section** (2): interrupts from users or other normal thread switches will not occur either; not sufficient when there are multiple processors
+6. **Test-and-Set**: a special machine instruction that is performed in a single instruction cycle (an atomic read and write)
+```c
+boolean test_and_set( int* i ) {
+    if ( *i == 0 ) {
+        *i = 1;
+        return true;
+    } else {
+        return false;
+    }
+}
+```
+7. **Busy-waiting**
+```c
+while ( !test_and_set( busy ) ) {
+    /* Wait for my turn */
+}
+/* Critical section */
+busy = 0;
+```
 
 ## Concurrency & Synchronization (Examples)
 
@@ -132,6 +151,39 @@ Thread A runs when `turn = 0`. Thread B runs when `turn = 1`.
 <td>
 
 ```
+A1. while ( busy == true ) {
+A2.     /* Wait for my turn */
+A3. }
+A4. busy = true;
+A5. /* critical section */
+A6. busy = false;
+```
+</td>
+<td>
+
+```
+B1. while ( busy == true ) {
+B2.     /* Wait for my turn */
+B3. }
+B4. busy = true;
+B5. /* critical section */
+B6. busy = false;
+```
+</td>
+</tr>
+</table>
+**WRONG** When thread switch happens after A3, both threads are in the critical section at the same time.
+
+
+<table>
+<tr>
+<th> Thread A </th>
+<th> Thread B </th>
+</tr>
+<tr>
+<td>
+
+```
 A1. flag[0] = true;
 A2. while ( flag[1] ) {
 A3.     /* Wait for my turn */
@@ -153,3 +205,4 @@ B6. flag[1] = false;
 </td>
 </tr>
 </table>
+**WRONG** Thread switches after A1 and B1 would lead both threads to stuck by the while loop.
