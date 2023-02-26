@@ -41,6 +41,14 @@ int main( int argc, char** argv ) {
 ```
 11. **Fork bomb**: A malicious program calls `fork` repeatedly, and the number of processes spawned is too high for the system to manage. To defend, we can set limit to (1) total number of processes a user may create, and (2) the rate a use spawns a new process.
 
+## Inter-Process Communication (IPC)
+1. **Sync send, sync receive**: sender is blocked when the message is sent, receiver will continue whether or not a message is received (uncommon)
+2. **Approaches to accomplish IPC** (4): file system; message passing; netwoking communication; pipes and shared memory
+3. **File system**: producer and consumer processes communicate through files in the file system; the system is responsible for file creation and manipulation (e.g. managing permissions)
+4. **Message passing using signals**
+    - signals are an interrupt with a specified ID and no messages
+    - 
+
 ## Threads
 1. **Thread info** (5): state; saved context; execution stack; local variables; access to resources (shared with all threads in the process)
 2.  **Motivation of creating a new thread** (5): faster than creating a process; faster terminating and cleaning up; takes less time to context switch; direct communications between threads; make part of a program responsive when part of it is blocked
@@ -116,6 +124,7 @@ busy = 0;
 9. **Mutext** from (mutual exclusion): a binary semaphore in which only the thread that has called `wait` may `post` to the semaphore
 10. No `malloc` in critical sections: the memory allocation can be blocked. The process is currently in the critical section so no other thread can enter critical section, which might result in the system getting totally stuck.
 11. **Deadlock** (informal definition): all threads are permanently stuck
+12. **Turnstile**: the pattern of a `wait` followed immediately by a `post`; allows one thread at a time to proceed through but allow all processes to proceed through
 
 ## Concurrency & Synchronization (Examples)
 
@@ -260,7 +269,7 @@ sem_destroy( &sem );
 </tr>
 </table>
 
-**CORRECT** Semaphore is initialized to 0. In this case, it makes sense for a thread to post a semaphore without the wait, and the mutex structure is not necessary in every circumstance.
+**CORRECT** Semaphore is initialized to 0. In this case, it makes sense for a thread to `post` a semaphore without the `wait`, and the mutex structure is not necessary in every circumstance.
 
 4. **Rendezvous**: Two threads "meet-up" at desired spots before either of them proceeds.
 <table>
@@ -397,3 +406,169 @@ sem_destroy( &sem );
 </table>
 
 **CORRECT** The mutex semaphore is initialized to n. 
+
+7. **Barrier**: generalization of the rendezvous problem; having more than two threads meet up at the smae point before any can proceed
+<table>
+<tr>
+<th> Thread K </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. wait( mutex )
+2. count++
+3. post( mutex )
+4. if count == n
+5.     post( barrier )
+6. end if
+7. wait( barrier )
+```
+</td>
+</tr>
+</table>
+
+**WRONG** The first `wait` after `post` is called will be unblocked while other threads will be stuck forever.
+
+<table>
+<tr>
+<th> Thread K </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. wait( mutex )
+2. count++
+3. post( mutex )
+4. if count == n
+5.     for i from 1 to n
+6.         post( barrier )
+7.     end for
+8. end if
+9. wait( barrier )
+```
+</td>
+</tr>
+</table>
+
+**CORRECT** But inefficient. In the worst case, there are 2n process switches.
+
+<table>
+<tr>
+<th> Thread K </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. wait( mutex )
+2. count++
+3. post( mutex )
+4. if count == n
+5.     post( barrier )
+6. end if
+7. wait( barrier )
+8. post( barrier )
+```
+</td>
+</tr>
+</table>
+
+**CORRECT** But it causes some minor distress accessing the value of `count` without a mutex lock.
+
+8. **Reusable Barrier**: decrement `count` variable to 0 when there are n threads reaching the "meet-up" point
+
+<table>
+<tr>
+<th> Thread K </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. wait( mutex )
+2. count++
+3. post( mutex )
+4. if count == n
+5.     post( turnstile )
+6. end if
+7. wait( turnstile )
+8. post( turnstile )
+9. [critical point]
+10. wait( mutex )
+11. count--
+12. post( mutex )
+13. if count == 0
+14.     wait( turnstile )
+15. end if
+```
+</td>
+</tr>
+</table>
+
+**WRONG** (1) Context switch at line 4 when `count == n` may cause a problem. (2) On line 13, more than one thread will be waiting for `turnstile`, which would result in deadlock.
+
+<table>
+<tr>
+<th> Thread K </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. wait( mutex )
+2. count++
+3. if count == n
+4.     post( turnstile )
+5. end if
+6. post( mutex )
+7. wait( turnstile )
+8. post( turnstile )
+9. [critical point]
+10. wait( mutex )
+11. count--
+12. if count == 0
+13.     wait( turnstile )
+14. end if
+15. post( mutex )
+```
+</td>
+</tr>
+</table>
+
+**WRONG** We fixed the problems in the previous case with `mutex`. It is possible for a thread to run before the critical section (e.g. running in a loop) while others have past the critical section.
+
+<table>
+<tr>
+<th> Thread K </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. wait( mutex )
+2. count++
+3. if count == n
+4.     wait( turnstile2 )
+5.     post( turnstile1 )
+6. end if
+7. post( mutex )
+8. wait( turnstile1 )
+9. post( turnstile1 )
+10. [critical point]
+11. wait( mutex )
+12. count--
+13. if count == 0
+14.     wait( turnstile1 )
+15.     post( turnstile2 )
+16. end if
+17. post( mutex )
+18. wait( turnstile2 )
+19. post( turnstile2 )
+```
+</td>
+</tr>
+</table>
+
+**CORRECT** It is a **two-phase barrier** because all threads have to wait twice.

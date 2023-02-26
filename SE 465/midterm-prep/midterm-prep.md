@@ -4,6 +4,18 @@
 
 ## Lecutre 2: Fault, 
 
+## Lecture 4: Structural Coverage
+1. a **TR** is the set of specific elements of a software artifact that a test case must stisfy or cover
+2. a **coverage citerion (C)** is a rule or collection or rulles that impose test requirements on a test set
+
+## Lecture 5: Graph Coverage
+1. A node is **syntactically** reachable from n_i if there exists a path from n_i to n in the graph.
+2. A node n is **semantically** reachable if one of the paths from n_i to n can be reached on some input.
+3. **node coverage** (NC); **edge coverage** (EC); **edge pair coverage** (EPC)
+4. a path is **simple** if no nodes appears more than once in the path except that first and last nodes may be the same
+5. a path is **prime** if it is simple and does not appear as a proper subpath of any other simple path
+4. **prime path coverage** (PPC); **complete path coverage** (CPC); **specified path coverage** (SPC)
+
 ## Lecture 6 & 7: Dataflow Coverage
 1. `def(n)` or `def(e)`: set of variables that are defined by node n or edge e
 2. `use(n)` or `use(e)`: set of variables that are used by node n or edge e
@@ -41,8 +53,8 @@ g(a) {
     - white box: new input should cover new paths; testers have access to the underlying framework, design, and structure of the software
 2. software instrumentation
     - adding extra codes to an application for monitoring some program behaviour
-    - **static** (compile-time): happens without running the program; the binary has instrumented codes
-    - **dynamic** (runtime): happens at runtime; the binary do not have instrumented codes; codes are instrumented in the process
+    - **static** (compile time): happens without running the program; the binary has instrumented codes
+    - **dynamic** (run time): happens at runtime; the binary do not have instrumented codes; codes are instrumented in the process
 3. tools
     - **valgrind memcheck** (dynamic) (10x+ slowdown)
         - checks (5): illegal reads/writes; uninitialized values; illegal frees; overlapping source and destination blocks; memory leaks
@@ -91,12 +103,13 @@ g(a) {
     - hooks into standard builds
     - shows mistakes immediately & suggests fixes
     - plugin of javac, pattern-based on AST
+8. other tools: **Coverity**, **Clang static analyzer**, **Facebook infer**
 
 ## Lecture 10: Syntax-Based Testing
 1. 
 
 ## Lecture 11: Mutation Testing
-1. idea: inserting artificial defects (**mutants**) in the codes -> checks if at least one of the test cases fails (testing the tests)
+1. idea: inserting artificial tdefects (**mutants**) in the codes -> checks if at least one of the test cases fails (testing the tests)
 2. generating mutants automatically
     - mutation operators: rules to apply syntactic changes to the changes
     - real fault based operators: apply changes very similar to defects seen in the past
@@ -117,10 +130,27 @@ g(a) {
     - do a subset of the generated mutants (random sampling)
 9. tools
     - Java (PIT, MuJava, Bacterio, Javalanche, Major, Descardes)
-    - PHP (HUmbug, Infection PHP)
+    - PHP (Humbug, Infection PHP)
     - JavaScript (Stryker)
     - C# (Nester, VisualMutator)
     - C/C++ (Dextool Mutate, Mutate.py)
 10. **mutation testing** (assess the quality of codes) vs. **mutation-based testing** (create more test cases)
 
-
+## Lecture 12: Beliefs, Bug Finding and Coverity
+1. finding bugs requires specifications, but how to get?
+    - programming languages come with specifications
+    - developers write specifications
+    - automated tools (static and dynamic analysis)
+2. **coverity**: find bugs in large programs; a leading company for buliding bug detection tools
+3. Without knowing the truty, we can find erros from:
+    - contradiction
+    - deviance
+4. **MUST beliefs**: inferred from acts that imply beliefs code "must" have -> check using internal consistency (infer beliefs at different locations, then cross-check for contradiction)
+5. **MAY beliefs**: inferred from acts that imply beliefs code "may" have -> need many examples to separate fact from coincidence -> rank errors by belief confidence
+6. trivial consistency NULL pointers may cause 3 types of errors:
+    - check-then-use
+    - use-then-check
+    - contradiction/redundant checks
+7. **Redundancy checking**
+    - identity operations (`x = x`, `1 * y`, `x & x`, `x | x`)
+    - assignments never read
