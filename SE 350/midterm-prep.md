@@ -347,7 +347,6 @@ busy = 0;
 10. No `malloc` in critical sections: the memory allocation can be blocked. The process is currently in the critical section so no other thread can enter critical section, which might result in the system getting totally stuck.
 11. **Deadlock** (informal definition): all threads are permanently stuck
 12. **Turnstile**: the pattern of a `wait` followed immediately by a `post`; allows one thread at a time to proceed through but allow all processes to proceed through
-13. **The Producer-Consumer Problem**: two threads share a common buffer of the same size; one generates data and the other one reads; producer blocks when the buffer is full and consumer blocks when the buffer has zero element in it
 
 ## Concurrency & Synchronization (Examples)
 1. **Mutual exclusion through flags**
@@ -796,7 +795,9 @@ sem_destroy( &sem );
 
 **CORRECT** It is a **two-phase barrier** because all threads have to wait twice.
 
-9. **The Producer-Consumer Problem**
+## The Producer-Consumer Problem
+1. Idea: two threads share a common buffer of the same size; one generates data and the other one reads; producer blocks when the buffer is full and consumer blocks when the buffer has zero element in it
+2. Pseudocodes
 <table>
 <tr>
 <th> Producer </th>
@@ -867,3 +868,156 @@ sem_destroy( &sem );
 </tr>
 </table>
 
+2 general semaphores: `items` (starts at 0, represents how many spaces in the buffer are full); `spaces` (starts at `BUFFER_SIZE`, represents the number of spaces in the buffer that are empty)
+<br />
+**WRONG** There might be context switches during producer/consumer adding/removing item from buffer.
+
+<table>
+<tr>
+<th> Producer </th>
+<th> Consumer </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. [produce item]
+2. wait( spaces )
+3. wait( mutex )
+4. [add item to buffer]
+5. post( mutex )
+6. post( items )
+```
+</td>
+<td>
+
+```c
+1. wait( items )
+2. wait( mutex )
+3. [remove item from buffer]
+4. post( mutex )
+5. post( spaces )
+6. [consume item]
+```
+</td>
+</tr>
+</table>
+
+**CORRECT** We add `mutex`, a binary semaphore that is initialized to 1, to protect the critical section.
+
+<table>
+<tr>
+<th> Producer </th>
+<th> Consumer </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. [produce item]
+2. wait( mutex )
+3. wait( spaces )
+4. [add item to buffer]
+5. post( items )
+6. post( mutex )
+```
+</td>
+<td>
+
+```c
+1. wait( mutex )
+2. wait( items )
+3. [remove item from buffer]
+4. post( spaces )
+5. post( mutex )
+6. [consume item]
+```
+</td>
+</tr>
+</table>
+
+**WRONG** A counterexample: a producer might be stuck between 2 and 3, waiting for `spaces` while no consumers can be executed because they are blocked on `mutex`. 
+
+3. Implementation in C
+```c
+pthread_mutex_init( pthread_mutex_t *mutex, pthread_mutexattr_t *attributes );
+pthread_mutex_lock( pthread_mutex_t *mutex ); /* blocking */
+pthread_mutex_trylock( pthread_mutex_t *mutex ); /* Returns 0 on success; non-blocking */
+pthread_mutex_unlock( pthread_mutex_t *mutex );
+pthread_mutex_destroy( pthread_mutex_t *mutex );
+
+int buffer[BUFFER_SIZE];
+int pindex = 0;
+int cindex = 0;
+sem_t spaces;
+sem_t items;
+pthread_mutex_t mutex;
+
+int produce( int id ) {
+    int r = rand();
+    printf("Producer %d produced %d.\n", id, r);
+    return r;
+}
+
+void consume( int id, int number ) {
+    printf("Consumer %d consumed %d.\n", id, number);
+}
+
+void* producer( void* arg ) {
+    int* id = (int*) arg;
+    for(int i = 0; i < 10000; ++i) {
+        int num = produce(*id);
+        sem_wait( &spaces );
+        pthread_mutex_lock( &mutex );
+        buffer[pindex] = num;
+        pindex = (pindex + 1) % BUFFER_SIZE;
+        pthread_mutex_unlock( &mutex );
+        sem_post( &items );
+    }
+    free( arg );
+    pthread_exit( NULL );
+}
+
+void* consumer( void* arg ) {
+    int* id = (int*) arg;
+    for(int i = 0; i < 10000; ++i) {
+        sem_wait( &items );
+        pthread_mutex_lock( &mutex );
+        int num = buffer[cindex];
+        buffer[cindex] = -1;
+        cindex = (cindex + 1) % BUFFER_SIZE;
+        pthread_mutex_unlock( &mutex );
+        sem_post( &spaces );
+        consume( *id, num );
+    }
+    free( id );
+    pthread_exit( NULL );
+}
+
+int main( int argc, char** argv ) {
+    sem_init( &spaces, 0, BUFFER_SIZE );
+    sem_init( &items, 0, 0 );
+    pthread_mutex_init( &mutex, NULL );
+    pthread_t threads[20];
+    for( int i = 0; i < 10; i++ ) {
+        int* id = malloc(sizeof(int));
+        *id = i;
+        pthread_create(&threads[i], NULL, producer, id);
+    }
+    for( int j = 10; j < 20; j++ ) {
+        int* jd = malloc(sizeof(int));
+        *jd = j-10;
+        pthread_create(&threads[j], NULL, consumer, jd);
+    }
+    for( int k = 0; k < 20; k++ ){
+        pthread_join(threads[k], NULL);
+    }
+    sem_destroy( &spaces );
+    sem_destroy( &items );
+    pthread_mutex_destroy( &mutex );
+    pthread_exit( 0 );
+}
+```
+
+## The Readers-Writers Problem
+1. 
