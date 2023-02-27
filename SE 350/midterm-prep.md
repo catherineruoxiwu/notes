@@ -12,7 +12,7 @@
     - 2 new states: ready/swapped; blocked/swapped
     - admit transition (new -> ready/swapped)
 9. **Running multiple processes in shell**: `gcc fork.c &` (start process and return control to the console); `screen` command
-10. **`fork()`** (3): < 0 (error); == 0 (child process); > 0 (parent process)
+10. **`fork()`** (3): < 0 (error); == 0 (child process); > 0 (parent process; pid = child's process ID)
 ```c
 int main( int argc, char** argv ) {
     pid_t pid;
@@ -274,7 +274,41 @@ int *rv = malloc( sizeof( int ) );
 pthread_exit( rv );
 ```
 6. Thread attributes: **joinable**; **detachable**; scheduling policy. To prevent a thread from being joined, we can call `pthread_detach`. When a joinable thread is finished, it cannot be cleaned up (its resources deallocated) until it is joined and the return value collected. A detached thread, when it finishes, is cleaned up automatically.
-7. Thread cancellation (2): **asynchronous cancellation** (one thread immediately terminates the target); **deferred cancellation** ()
+7. Thread cancellation (2): **asynchronous cancellation** (one thread immediately terminates the target); **deferred cancellation** (default) (target is informed that it is cancelled and the target is responsible for cleaning itself up)
+```c
+/* type: PTHREAD_CANCEL_DEFERRED or PTHREAD_CANCEL_ASYNCHRONOUS */
+pthread_setcanceltype( int type, int *oldtype );
+```
+8. A large number of functions are **cancellation points**: the POSIX specification requires an implicit check for cancellation when calling one of those functions
+9. Sometimes a thread can be terminated before it has cleaned up some resources. **Cleanup handler** can help with it!
+```c
+pthread_cleanup_push( void (*routine)(void*), void *argument ); /* Register cleanup handler, with argument */
+pthread_cleanup_pop( int execute ); /* Run if execute is non-zero */
+
+void cleanup( void* mem ) {
+    if ( *( ( void ** ) mem) != NULL ) {
+        free( *( ( void ** ) mem) );
+    }
+}
+
+void* do_work( void* argument ) {
+    struct job * j = malloc( sizeof( struct job ) );
+    pthread_cleanup_push( cleanup, &j );
+    /* Do something */
+    free( j );
+    pthread_cleanup_pop( 0 ); /* Don’t run */
+    pthread_exit( NULL );
+}
+
+/* Alternative implementation */
+void* do_work( void* argument ) {
+    struct job * j = malloc( sizeof( struct job ) );
+    pthread_cleanup_push( cleanup, &j );
+    /* Do something */
+    pthread_cleanup_pop( 1 ); /* Run */
+    pthread_exit( NULL );
+}
+```
 
 ## Concurrency & Synchronization (Concepts)
 1. **Synchronization** vs. **parallelism**: synchronization (multiple processes and threads making progress at the same time); parallelism (more than one thread or process executing on a CPU at a given instant)
@@ -313,6 +347,7 @@ busy = 0;
 10. No `malloc` in critical sections: the memory allocation can be blocked. The process is currently in the critical section so no other thread can enter critical section, which might result in the system getting totally stuck.
 11. **Deadlock** (informal definition): all threads are permanently stuck
 12. **Turnstile**: the pattern of a `wait` followed immediately by a `post`; allows one thread at a time to proceed through but allow all processes to proceed through
+13. **The Producer-Consumer Problem**: two threads share a common buffer of the same size; one generates data and the other one reads; producer blocks when the buffer is full and consumer blocks when the buffer has zero element in it
 
 ## Concurrency & Synchronization (Examples)
 1. **Mutual exclusion through flags**
@@ -345,7 +380,8 @@ B5. turn = 0;
 </tr>
 </table>
 
-Thread A runs when `turn = 0`. Thread B runs when `turn = 1`.
+Thread A runs when `turn = 0`. Thread B runs when `turn = 1`. 
+<br />
 **WRONG** (1) strict alternation is needed: A -> B -> A -> B -> ... (2) If thread B is terminated, thread A will be stuck forever.
 
 <table>
@@ -759,3 +795,75 @@ sem_destroy( &sem );
 </table>
 
 **CORRECT** It is a **two-phase barrier** because all threads have to wait twice.
+
+9. **The Producer-Consumer Problem**
+<table>
+<tr>
+<th> Producer </th>
+<th> Consumer </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. [produce item]
+2. added = false
+3. while added is false
+4.     wait( mutex )
+5.     if count < BUFFER_SIZE
+6.         [add item to buffer]
+7.         count++
+8.         added = true
+9.     end if
+10.    post( mutex )
+11. end while
+```
+</td>
+<td>
+
+```c
+1. removed = false
+2. while removed is false
+3.     wait( mutex )
+4.     if count > 0
+5.         [remove item from buffer]
+6.         count--
+7.         removed = true
+8.     end if
+9.     post( mutex )
+10. end while
+11. [consume item]
+```
+</td>
+</tr>
+</table>
+
+**CORRECT** But inefficient because of busy waiting.
+
+<table>
+<tr>
+<th> Producer </th>
+<th> Consumer </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. [produce item]
+2. wait( spaces )
+3. [add item to buffer]
+4. post( items )
+```
+</td>
+<td>
+
+```c
+1. wait( items )
+2. [remove item from buffer]
+3. post( spaces )
+4. [consume item]
+```
+</td>
+</tr>
+</table>
+
