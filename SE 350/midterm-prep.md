@@ -796,8 +796,10 @@ sem_destroy( &sem );
 **CORRECT** It is a **two-phase barrier** because all threads have to wait twice.
 
 ## The Producer-Consumer Problem
-1. Idea: two threads share a common buffer of the same size; one generates data and the other one reads; producer blocks when the buffer is full and consumer blocks when the buffer has zero element in it
-2. Pseudocodes
+1. Idea: two threads share a common buffer of the same size; one generates data and the other one reads
+
+2. Producer blocks when the buffer is full and consumer blocks when the buffer has zero element in it.
+
 <table>
 <tr>
 <th> Producer </th>
@@ -868,7 +870,7 @@ sem_destroy( &sem );
 </tr>
 </table>
 
-2 general semaphores: `items` (starts at 0, represents how many spaces in the buffer are full); `spaces` (starts at `BUFFER_SIZE`, represents the number of spaces in the buffer that are empty)
+There are two general semaphores: `items` (starts at 0, represents how many spaces in the buffer are full); `spaces` (starts at `BUFFER_SIZE`, represents the number of spaces in the buffer that are empty)
 <br />
 **WRONG** There might be context switches during producer/consumer adding/removing item from buffer.
 
@@ -938,7 +940,6 @@ sem_destroy( &sem );
 
 **WRONG** A counterexample: a producer might be stuck between 2 and 3, waiting for `spaces` while no consumers can be executed because they are blocked on `mutex`. 
 
-3. Implementation in C
 ```c
 pthread_mutex_init( pthread_mutex_t *mutex, pthread_mutexattr_t *attributes );
 pthread_mutex_lock( pthread_mutex_t *mutex ); /* blocking */
@@ -1020,4 +1021,239 @@ int main( int argc, char** argv ) {
 ```
 
 ## The Readers-Writers Problem
-1. 
+1.  Idea: concurrently reading and modification of a data structure or record by more than one thread
+2. Any number of readers may enter the critical section simultaneously; only one writer is allowed in the critical section.
+
+<table>
+<tr>
+<th> Writer </th>
+<th> Reader </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. wait( roomEmpty )
+2. [write data]
+3. post( roomEmpty )
+```
+</td>
+<td>
+
+```c
+1. wait( mutex )
+2. readers++
+3. if readers == 1
+4.     wait( roomEmpty )
+5. end if
+6. post( mutex )
+7. [read data]
+8. wait( mutex )
+9. readers--
+10. if readers == 0
+11.     post( roomEmpty )
+12. end if
+13. post( mutex )
+```
+</td>
+</tr>
+</table>
+
+`mutex` and `roomEmpty` are binary semaphores. This pattern is the **light switch** (the first one into the room turns on the lights and the last one
+out turns them off).
+<br />
+**WRONG** Starvation of the writer thread might occur. 
+
+<table>
+<tr>
+<th> Writer </th>
+<th> Reader </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. wait( turnstile )
+2. wait( roomEmpty )
+3. [write data]
+4. post( turnstile )
+5. post( roomEmpty )
+```
+</td>
+<td>
+
+```c
+1. wait( turnstile )
+2. post( turnstile )
+3. wait( mutex )
+4. readers++
+5. if readers == 1
+6. wait( roomEmpty )
+7. end if
+8. post( mutex )
+9. [read data]
+10. wait( mutex )
+11. readers--
+12. if readers == 0
+13. post( roomEmpty )
+14. end if
+15. post( mutex )
+```
+</td>
+</tr>
+</table>
+
+When a writer arrives, any readers currently reading should finish and no new readers should be allowed to enter.
+<br />
+**CORRECT** But not optimal. The solution does not give writers any particular priority.
+
+<table>
+<tr>
+<th> Writer </th>
+<th> Reader </th>
+</tr>
+<tr>
+<td>
+
+```c
+1. wait( writeMutex )
+2. writers++
+3. if writers == 1
+4.     wait( noReaders )
+5. end if
+6. post( writeMutex )
+7. wait ( noWriters )
+8. [write data]
+9. post( noWriters )
+10. wait( writeMutex )
+11. writers--
+12. if writers == 0
+13.     post( noReaders )
+14. end if
+15. post( writeMutex )
+```
+</td>
+<td>
+
+```c
+1. wait( noReaders )
+2. wait( readMutex )
+3. readers++
+4. if readers == 1
+5.     wait( noWriters )
+6. end if
+7. post( readMutex )
+8. post( noReaders )
+9. [read data]
+10. wait( readMutex )
+11. readers--
+12. if readers == 0
+13.     post( noWriters )
+14. end if
+15. post( readMutex )
+```
+</td>
+</tr>
+</table>
+
+**CORRECT** `roomEmpty` breaks up to `noReaders` and `noWriters`
+
+```c
+pthread_rwlock_init( pthread_rwlock_t * rwlock, pthread_rwlockattr_t * attr );
+pthread_rwlock_rdlock( pthread_rwlock_t * rwlock );
+pthread_rwlock_tryrdlock( pthread_rwlock_t * rwlock );
+pthread_rwlock_wrlock( pthread_rwlock_t * rwlock );
+pthread_rwlock_trywrlock( pthread_rwlock_t * rwlock );
+pthread_rwlock_unlock( pthread_rwlock_t * rwlock );
+pthread_rwlock_destroy( pthread_rwlock_t * rwlock );
+
+pthread_rwlock_t rwlock;
+
+void init( ) {
+    pthread_rwlock_init( &rwlock, NULL );
+}
+
+void cleanup( ) {
+    pthread_rwlock_destroy( &rwlock );
+}
+
+void* writer( void* arg ) {
+    pthread_rwlock_wrlock( &rwlock );
+    write_data( arg );
+    pthread_rwlock_unlock( &rwlock );
+}
+
+void* reader( void* read ) {
+    pthread_rwlock_rdlock( &rwlock );
+    read_data( arg );
+    pthread_rwlock_unlock( &rwlock );
+}
+```
+
+3. **The Search-Insert-Delete Problem**
+    - **searchers** examine the list; can execute concurrently with other serachers
+    - **inserters** add new items to the list; can be done in parallel with search; one insertion may take place at a time
+    - **deleters** remove items from anywhere in the list; one deletion may take place at a time; no searchers or inserters can run at the same time
+```c
+pthread_mutex_t searcher_mutex;
+pthread_mutex_t inserter_mutex;
+pthread_mutex_t perform_insert;
+sem_t no_searchers;
+sem_t no_inserters;
+int searchers;
+int inserters;
+
+void init( ) {
+    pthread_mutex_init( &searcher_mutex, NULL );
+    pthread_mutex_init( &inserter_mutex, NULL );
+    pthread_mutex_init( &perform_insert, NULL );
+    sem_init( &no_inserters, 0, 1 );
+    sem_init( &no_searchers, 0, 1 );
+    searchers = 0;
+    inserters = 0;
+}
+
+void* searcher_thread( void *target ) {
+    pthread_mutex_lock( &searcher_mutex );
+    searchers++;
+    if ( searchers == 1 ) {
+        sem_wait( &no_searchers );
+    }
+
+    pthread_mutex_unlock( &searcher_mutex );
+    search( target );
+    pthread_mutex_lock( &searcher_mutex );
+    searchers--;
+    if ( searchers == 0 ) {
+        sem_post( &no_searchers );
+    }
+    pthread_mutex_unlock( &searcher_mutex );
+}
+
+void* deleter_thread( void* to_delete ) {
+    sem_wait( &no_searchers );
+    sem_wait( &no_inserters );
+    delete( to_delete );
+    sem_post( &no_inserters );
+    sem_post( &no_searchers );
+}
+
+void* inserter_thread( void *to_insert ) {
+    pthread_mutex_lock( &inserter_mutex );
+    inserters++;
+    if ( inserters == 1 ) {
+        sem_wait( &no_inserters );
+    }
+    pthread_mutex_unlock( &inserter_mutex );
+    node * insert_after = find_insert_location( );
+    pthread_mutex_lock( &perform_insert );
+    insert( to_insert, insert_after ); /* Can update its position if needed */
+    pthread_mutex_unlock( &perform_insert );
+    pthread_mutex_lock( &inserter_mutex );
+    inserters--;
+    if ( inserters == 0 ) {
+        sem_post( &no_inserters );
+    }
+    pthread_mutex_unlock( &inserter_mutex );
+}
+```
