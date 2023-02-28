@@ -1219,7 +1219,6 @@ void* searcher_thread( void *target ) {
     if ( searchers == 1 ) {
         sem_wait( &no_searchers );
     }
-
     pthread_mutex_unlock( &searcher_mutex );
     search( target );
     pthread_mutex_lock( &searcher_mutex );
