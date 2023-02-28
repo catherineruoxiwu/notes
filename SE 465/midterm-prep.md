@@ -1,7 +1,5 @@
 # SE 465 Midterm Notes
 
-- MAY MUST examples
-
 ## Lecture 1: Introduction
 1. Bugs are **prevalent** and **costly**.
 2. Recent bugs (4): log4shell (logging library for Java; allows remote code execution) (2021); Heartbleed (no bound check of ; a widely used security protocol library; affected CRA) (2014); Amazon Prime Day Down (2018) (non-functional requirement; scalability); British Airways (2019) (IT outage)
@@ -48,7 +46,6 @@
 6. **Prime Path Coverage** (PPC); **Complete Path Coverage** (CPC); **Specified Path Coverage** (SPC)
 7. A node n is **syntactically** reachable from ni if there exists a path from ni to n. (BFS, DFS) A node n is **semantically** reachable if one of the paths from ni to n can be reached on some input. (undecidable)
 
-
 ## Lecture 6 & 7: Dataflow Coverage
 1. `def(n)` or `def(e)`: set of variables that are defined by node n or edge e
 2. `use(n)` or `use(e)`: set of variables that are used by node n or edge e
@@ -90,10 +87,10 @@ g(a) {
     - **static** (compile time): happens without running the program; the binary has instrumented codes
     - **dynamic** (run time): happens at runtime; the binary do not have instrumented codes; codes are instrumented in the process
 3. Tools
-    - <ins>**Valgrind memcheck**</ins> (dynamic) (10x+ slowdown)
+    - <ins>**Valgrind**</ins> (dynamic) (10x+ slowdown)
         - checks (5): illegal reads/writes; uninitialized values; illegal frees; overlapping source and destination blocks; memory leaks
-        - does not perform bounds checking for stack or global arrays
-        - dynamically emulates a CPU and checks during runtime
+        - **does not** perform bounds checking for stack or global arrays
+        - dynamically emulates a CPU and checks during runtime and checks, at each memory access, whether that access is legitimate or not
     - <ins>**Address sanitizer**</ins> (Asan) (static) (2x slowdown)
         - rewrites relevant memory access at compile-time to call a checking library
         - (in virtual memory) mem is the normal application memory; shadow is the memory that keeps track of meta-data (for each byte addr of mem, shadow contains a discriptor); poisoning a byte addr of mem means writing a special value to corresponding place in shadow
@@ -106,13 +103,15 @@ g(a) {
         - detects undefined behavious (e.g. integer overflow)
 4. **Fuzz testing**: tries to identify abnormal program behaviours by evaluation how the tested program responds to various inputs
     - challenges (4): finding interesting inputs; exploring the whole system, not just individual tools or functions; reducing the size of test cases; reducing duplication
-    - naive fuzzer: random data; pros (easy, fast); issues (relies on luck; may run the same things repeatedly) 
-    - generation-based fuzzing: **Csmith**, **Funfuzz**
+    - naive fuzzer: random data; pros (easy to implement, fast); issues (relies on luck; may run the same things repeatedly; 'shallow' program exploration) 
+    - generation-based fuzzing: <ins>**Csmith**</ins>, <ins>**Funfuzz**</ins>
     - tools that automatically discover clean, interesting test cases that trigger new program states in the targeted binary （mutation-based fuzzing)
-        - **American fuzzy loop (AFL)**
+        - <ins>**American fuzzy loop (AFL)**</ins>
             - security-oriented; compile-time instrumentation
             - passes input in a file (between processes)
-        - **libFuzzer**
+            - genetic algorithms to automatically discover clean, interesting test cases that trigger new internal program states in the targeted binary
+        - <ins>**libFuzzer**</ins>
+            - similar to AFL, but fuzzes the program in the same process, thus faster
             - fuzzes the program in the same process
             - requires "fuzz targets" (entry points that accept an array of bytes)
             - executes the fuzz target multiple times with different inputs
@@ -122,26 +121,23 @@ g(a) {
     - to detect: compiler warning
     - to avoid: do not use goto; use `{` and `}`; format codes
 2. **Static analysis**: the examination of a piece of software without running it
-3. **SpotBugs (FindBugs)**
+3. <ins>**SpotBugs (FindBugs)**</ins>
     - an open-source static bytecode analyzer
     - looks for defects based on bug patterns -> group patterns into categories -> assign priority
 4. Bug categories (4): correctness; common practice violations; concurrency; performance; security threats
-5. **PMD**
+5. <ins>**PMD**</ins>
     - finds common programming flaws (unused variables, empty catch blocks, unnecessary object creations, ...)
     - includes CPD that fins duplicated codes
     - searches for patterns on Abstract Syntax Tree (AST)
-6. **CheckerFramework**
+6. <ins>**CheckerFramework**</ins>
     - an extension to Java's type system
     - based on data-flow analysis on source code AST
     - runs as a plugin of javac
-7. **ErrorProne**
+7. <ins>**ErrorProne**</ins>
     - hooks into standard builds
     - shows mistakes immediately & suggests fixes
     - plugin of javac, pattern-based on AST
-8. Other tools: **Coverity**, **Clang static analyzer**, **Facebook infer**
-
-## Lecture 10: Syntax-Based Testing
-1. 
+8. Other tools: <ins>**Coverity**</ins>, <ins>**Clang static analyzer**</ins>, <ins>**Facebook infer**</ins>
 
 ## Lecture 11: Mutation Testing
 1. Idea: inserting artificial defects (**mutants**) in the codes -> checks if at least one of the test cases fails (testing the tests)
