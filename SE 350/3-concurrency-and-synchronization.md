@@ -33,7 +33,7 @@ busy = 0;
         - if the semaphore is 1, do nothing
         - if the semaphore is 0 and there is a task blocked awaiting the semaphore, the task gets unblocked
         - if the semaphore is 0 and there are not any tasks blocked, set the semaphore to 1
-9. **Mutext** from (mutual exclusion): a binary semaphore in which only the thread that has called `wait` may `post` to the semaphore
+9. **Mutex** from (mutual exclusion): a binary semaphore in which only the thread that has called `wait` may `post` to the semaphore
 10. No `malloc` in critical sections: the memory allocation can be blocked. The process is currently in the critical section so no other thread can enter critical section, which might result in the system getting totally stuck.
 11. **Deadlock** (informal definition): all threads are permanently stuck
 12. **Turnstile**: the pattern of a `wait` followed immediately by a `post`; allows one thread at a time to proceed through but allow all processes to proceed through
