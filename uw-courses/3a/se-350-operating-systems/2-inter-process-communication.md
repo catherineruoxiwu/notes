@@ -4,10 +4,10 @@
 1. **Sync send, sync receive**: sender is blocked when the message is sent, receiver will continue whether or not a message is received (uncommon)
 2. **Approaches to accomplish IPC** (4): **file system**; **message passing**; **netwoking communication**; **pipes and shared memory**
 
-### File System
+## File System
 1. producer and consumer processes communicate through files in the file system; the system is responsible for file creation and manipulation (e.g. managing permissions)
 
-### Message passing
+## Message passing
 1. **Message passing using signals**: signals are an interrupt with a specified ID and no messages
 ```c
 /* both functions return 0 when successful and -1 when failed */
@@ -93,9 +93,88 @@ int main( int argc, char** argv ) {
     return 0;
 }
 ```
-### Network Communication
+## Network Communication
+1. Idea: how to communicate over the network in a standard way; estabilish communication between two processes
+2. **Datagram**: like sending mail; no connection is established; unidirectional
+3. **Stream**: like making telephone call
+```c
+/* domain: the address format (IPv4 AF_INET, Ipv6, and more)
+   type: SOCK_DGRAM; SOCK_STREAM 
+   protocol: 0 fro the default (stream: TCP/IP; datagram: UDP) */
+int socket( int domain, int type, int protocol );
+```
+4. **Check number format**: there are two possible (reasonable) orders for how its bytes can be stored: smallest to largest or largest to smallest. `arpa/inet.h` can help with the translation.
+```c
+uint32_t htonl( uint32_t hostint32 ); /* Translate 4 byte int to network format */
+uint16_t htons( uint16_t hostint16 ); /* Translate 2 byte int to network format */
+uint32_t ntohl( uint32_t netint32 ); /* Translate 4 byte int to host format */
+uint16_t ntohs( uint16_t netint16 ); /* Translate 2 byte int to host format */
+```
+5. **Address**: we want to call someone, we need to put in their phone numbers
+```c
+struct sockaddr_in {
+    sa_family_t sin_family; /* Address family */
+    in_port_t sin_port; /* Port number */
+    struct in_addr sin_addr; /* IPv4 Address */
+};
 
-### Pipes and Shared Memory
+struct sockaddr_in addr;
+addr.sin_family = AF_INET; /* IPv4 */
+addr.sin_port = htons( 2520 );
+addr.sin_addr.s_addr = htonl( INADDR_ANY ); /* Current IP address of the current comp */
+```
+6. Ports: below 1024 (reserved for system services); 22 (ssh); 80 (HTTP)
+7. Looking up addresses by name
+```c
+int getaddrinfo(const char *node, /* e.g. "www.example.com" or IP */
+                const char *service, /* e.g. "http" or port number */
+                const struct addrinfo *hints,
+                struct addrinfo **res); /* info will be returned in res*/
+
+struct addrinfo hints;
+struct addrinfo *res; /* will point to the results
+43 */
+memset(&hints, 0, sizeof hints); /* make sure the struct is empty */
+hints.ai_family = AF_INET; /* Choose IPv4 */
+hints.ai_socktype = SOCK_STREAM; /* TCP stream sockets */
+hints.ai_flags = AI_PASSIVE; /* fill in my IP for me */
+int result = getaddrinfo("www.example.com", "2520", &hints, &res);
+if (result != 0) {
+    return -1;
+}
+struct sockaddr_in * sain = (struct sockaddr_in*) res->ai_addr; /* the actual info linked list */
+freeaddrinfo( res );
+```
+8. **Client: Connect**
+```c
+int connect( int sockfd, struct sockaddr *addr, socklen_t len);
+
+getaddrinfo("www.uwaterloo.ca", "80", &hints, &res);
+sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+int status = connect(sockfd, res->ai_addr, res->ai_addrlen);
+```
+9. **Server: Bind, Listen, and Accept**
+    - bind (got a phone number): associate the socket with the port
+    - listen (phone turned on): wait for incoming connections
+    - accept (press the green icon)
+```c
+/* backlog is a upper bound for number of connections, 
+   if the queue is full, we reject additional requests */
+int listen( int sockfd, int backlog );
+/* returns a new socket file descriptor where further communication takes palce */
+int accept( int sockfd, struct sockaddr *addr, socklen_t *len );
+
+bind( socketfd, (struct sockaddr*) &addr, sizeof( addr ) );
+listen( socketfd, 5 );
+int newsockfd = accept( socketfd, NULL, NULL );
+/* Do something */
+
+close( newsockfd );
+close( socketfd );
+```
+10. [TODO]
+
+## Pipes and Shared Memory
 1. **Pipe**: unidirectional communication between a producer and a consumer
     - sender placed the message in small chunks while the receiver reads one character at a time
     - A **named pipe** is a pipe stored on disk. It exists even when the creating process has terminated. It is bidirectional (communication happens one direction at a time).
